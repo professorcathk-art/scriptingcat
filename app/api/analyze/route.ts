@@ -85,6 +85,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[v0] Analysis completed successfully")
+    
+    // Save to history (in a real app, this would be saved to database)
+    // For now, we'll just log it - the frontend will handle localStorage
+    console.log("[v0] Analysis saved to history:", {
+      id: `analysis_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      platform,
+      url: url || undefined,
+      manualText: manualText || undefined,
+      transcript: transcript,
+      analysis: enhancedAnalysis,
+      isFavorite: false
+    })
+    
     return NextResponse.json(enhancedAnalysis)
   } catch (error) {
     console.error("[v0] Analysis error details:", {

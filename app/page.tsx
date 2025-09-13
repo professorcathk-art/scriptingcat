@@ -101,6 +101,12 @@ const TrendingIcon = () => (
   </svg>
 )
 
+const UserIcon = () => (
+  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+)
+
 export default function SocialMediaAnalyzer() {
   const [url, setUrl] = useState("")
   const [manualText, setManualText] = useState("")
@@ -277,6 +283,27 @@ export default function SocialMediaAnalyzer() {
       setAnalysis(analysisResult)
       setTranscript(analysisResult.transcript || "")
 
+      // Save to history
+      const historyItem = {
+        id: `analysis_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        platform: analysisResult.platform,
+        url: inputMode === 'url' ? url : undefined,
+        manualText: inputMode === 'text' ? manualText : undefined,
+        transcript: analysisResult.transcript || "",
+        analysis: analysisResult,
+        isFavorite: false
+      }
+      
+      // Load existing history and add new item
+      const existingHistory = localStorage.getItem('analysis-history')
+      const history = existingHistory ? JSON.parse(existingHistory) : []
+      history.unshift(historyItem) // Add to beginning
+      
+      // Keep only last 50 items
+      const limitedHistory = history.slice(0, 50)
+      localStorage.setItem('analysis-history', JSON.stringify(limitedHistory))
+
       // Increment usage count
       const newSubscription = incrementUsage(updatedSubscription)
       setUserSubscription(newSubscription)
@@ -363,6 +390,15 @@ export default function SocialMediaAnalyzer() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/portal'}
+                className="hidden sm:flex items-center gap-2"
+              >
+                <UserIcon />
+                {language === "zh" ? "用戶中心" : "Portal"}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
