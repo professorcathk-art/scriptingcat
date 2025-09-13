@@ -32,7 +32,10 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
       'Advanced analysis',
       'Premium templates',
       'Priority support',
-      'Export options'
+      'Export options',
+      'API access',
+      '24/7 priority support',
+      'White-label options'
     ]
   },
   {
@@ -45,9 +48,7 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
       '500 script variations per day',
       'AI-powered insights',
       'Custom templates',
-      '24/7 priority support',
-      'API access',
-      'White-label options'
+      'Everything in Pro plan included'
     ]
   }
 ]

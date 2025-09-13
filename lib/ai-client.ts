@@ -1,6 +1,60 @@
 const baseURL = "https://api.aimlapi.com/v1"
 const apiKey = "2d8e82325b6e4d29886ab2a6ebd13492"
 
+export async function polishTranscript(
+  transcript: string,
+  language = "en"
+): Promise<string> {
+  try {
+    console.log("[v0] Polishing transcript with AI")
+    
+    const prompt = language === "zh" 
+      ? `請修正以下社交媒體內容的標點符號和拼寫錯誤，但保持原始訊息和語氣不變。只返回修正後的文本，不要添加任何解釋：
+
+${transcript}`
+      : `Please fix punctuation and spelling errors in the following social media content while keeping the original message and tone intact. Only return the corrected text without any explanations:
+
+${transcript}`
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 1000,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error("[v0] OpenAI API error:", response.status, response.statusText)
+      return transcript // Return original if polishing fails
+    }
+
+    const data = await response.json()
+    const polishedText = data.choices[0]?.message?.content?.trim()
+    
+    if (polishedText) {
+      console.log("[v0] Transcript polished successfully")
+      return polishedText
+    }
+    
+    return transcript
+  } catch (error) {
+    console.error("[v0] Error polishing transcript:", error)
+    return transcript // Return original if polishing fails
+  }
+}
+
 export async function analyzeScript(content: string, platform: string, language = "en") {
   const systemPrompt =
     language === "zh"

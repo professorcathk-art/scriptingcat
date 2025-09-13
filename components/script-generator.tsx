@@ -226,13 +226,22 @@ export function ScriptGenerator({ analysis, language = "en" }: ScriptGeneratorPr
     }
   }
 
-  const copyToClipboard = (script: GeneratedScript) => {
-    const fullScript = `${script.hook}\n\n${script.body}\n\n${script.cta}`
-    navigator.clipboard.writeText(fullScript)
-    toast({
-      title: t.scriptCopied,
-      description: t.scriptCopiedDesc,
-    })
+  const copyToClipboard = async (script: GeneratedScript) => {
+    try {
+      const fullScript = `${script.hook}\n\n${script.body}\n\n${script.cta}`
+      await navigator.clipboard.writeText(fullScript)
+      toast({
+        title: language === "zh" ? "腳本已複製" : "Script Copied",
+        description: language === "zh" ? "腳本已成功複製到剪貼板" : "Script has been copied to clipboard",
+      })
+    } catch (error) {
+      console.error('Failed to copy script:', error)
+      toast({
+        title: language === "zh" ? "複製失敗" : "Copy Failed",
+        description: language === "zh" ? "無法複製腳本到剪貼板" : "Failed to copy script to clipboard",
+        variant: "destructive",
+      })
+    }
   }
 
   const downloadScript = (script: GeneratedScript, index: number) => {

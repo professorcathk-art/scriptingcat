@@ -95,7 +95,7 @@ export function SubscriptionManager({ userSubscription, onUpgrade, language = "e
                 } ${isUpgrade(tier.id) ? 'border-green-200 dark:border-green-800' : ''}`}
                 onClick={() => setSelectedTier(tier.id)}
               >
-                {tier.id === 'expert' && (
+                {tier.id === 'pro' && (
                   <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
                     <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
                       {language === "zh" ? "最受歡迎" : "Most Popular"}
@@ -131,7 +131,7 @@ export function SubscriptionManager({ userSubscription, onUpgrade, language = "e
                   
                   <Button 
                     className="w-full mt-4"
-                    variant={tier.id === 'expert' ? 'default' : 'outline'}
+                    variant={tier.id === 'pro' ? 'default' : 'outline'}
                     onClick={(e) => {
                       e.stopPropagation()
                       onUpgrade(tier.id)
@@ -173,6 +173,23 @@ export function SubscriptionManager({ userSubscription, onUpgrade, language = "e
           </CardContent>
         </Card>
       )}
+
+      {/* Stay Free Option */}
+      <div className="text-center pt-6 border-t">
+        <p className="text-sm text-muted-foreground mb-4">
+          {language === "zh" 
+            ? "想要繼續使用免費方案？" 
+            : "Want to continue with the free plan?"
+          }
+        </p>
+        <Button 
+          variant="outline" 
+          onClick={() => window.close()}
+          className="px-8"
+        >
+          {language === "zh" ? "暫時繼續免費使用" : "Continue with Free Plan"}
+        </Button>
+      </div>
     </div>
   )
 }

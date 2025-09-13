@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { analyzeScript, fetchYouTubeTranscript, extractYouTubeVideoId } from "@/lib/ai-client"
+import { analyzeScript, fetchYouTubeTranscript, extractYouTubeVideoId, polishTranscript } from "@/lib/ai-client"
 import { extractContentFromUrl } from "@/lib/content-extractor"
 
 export async function POST(request: NextRequest) {
@@ -45,16 +45,25 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Content extracted:", { platform, contentLength: content.length, hasTranscript: !!transcript })
 
+    // Polish the transcript with AI for better readability
+    let polishedContent = content
+    if (transcript && transcript.trim()) {
+      console.log("[v0] Polishing transcript...")
+      polishedContent = await polishTranscript(transcript, language)
+      console.log("[v0] Transcript polished successfully")
+    }
+
     // Analyze the content with AI
     console.log("[v0] Starting AI analysis...")
-    const analysis = await analyzeScript(content, platform, language)
+    const analysis = await analyzeScript(polishedContent, platform, language)
     console.log("[v0] AI analysis completed:", analysis)
 
     // Add some additional computed metrics
     const enhancedAnalysis = {
       ...analysis,
       platform,
-      transcript,
+      transcript: transcript, // Original transcript
+      polished_transcript: polishedContent, // AI-polished transcript
       engagement_score: Math.floor(Math.random() * 20) + 80, // 80-100
       hook_strength: Math.floor(Math.random() * 20) + 80,
       retention_score: Math.floor(Math.random() * 25) + 75,

@@ -50,66 +50,99 @@ export async function extractContentFromUrl(
         console.log("[v0] Instagram API failed:", response.status, response.statusText)
       }
     } else if (platform === "threads") {
-      // For Threads, we'll extract the text content from the post
-      // Since Threads doesn't have a public API, we'll use a web scraping approach
+      // Extract username from Threads URL
       try {
         console.log("[v0] Extracting Threads content from URL:", url)
         
-        // Use a web scraping service or direct fetch to get the page content
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        // Extract username from URL like https://www.threads.com/@username/post/...
+        const usernameMatch = url.match(/@([^/]+)/)
+        if (!usernameMatch) {
+          throw new Error("Could not extract username from Threads URL")
+        }
+        
+        const username = usernameMatch[1]
+        console.log("[v0] Extracted username:", username)
+        
+        // Use RapidAPI Threads API
+        const response = await fetch(
+          `https://threads-api4.p.rapidapi.com/api/user/info?username=${username}`,
+          {
+            method: 'GET',
+            headers: {
+              'x-rapidapi-host': 'threads-api4.p.rapidapi.com',
+              'x-rapidapi-key': '95af1b4bc7mshe7f0e89ab036e1bp1639cfjsn4303dd6c7328',
+            },
           }
-        })
+        )
         
         if (response.ok) {
-          const html = await response.text()
+          const data = await response.json()
+          console.log("[v0] Threads API response:", data)
           
-          // Extract text content from the Threads post
-          // This is a simplified approach - in production you might want to use a more robust parser
-          const textMatch = html.match(/"text":"([^"]+)"/g)
-          if (textMatch && textMatch.length > 0) {
-            // Get the first text match (usually the main post content)
-            const textContent = textMatch[0].replace(/"text":"([^"]+)"/, '$1')
-            // Decode any escaped characters
-            const decodedContent = textContent
-              .replace(/\\n/g, '\n')
-              .replace(/\\"/g, '"')
-              .replace(/\\'/g, "'")
-              .replace(/\\\\/g, '\\')
-            
-            if (decodedContent.trim()) {
-              return {
-                content: decodedContent.trim(),
-                platform: "Threads",
-                transcript: decodedContent.trim(),
-              }
-            }
+          // Extract bio or latest post content
+          let content = ""
+          if (data.bio) {
+            content = data.bio
+          } else if (data.latest_posts && data.latest_posts.length > 0) {
+            content = data.latest_posts[0].text || ""
           }
           
-          // Fallback: try to extract from meta tags
-          const metaMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i)
-          if (metaMatch) {
-            const metaContent = metaMatch[1]
-              .replace(/&amp;/g, '&')
-              .replace(/&lt;/g, '<')
-              .replace(/&gt;/g, '>')
-              .replace(/&quot;/g, '"')
-              .replace(/&#39;/g, "'")
-            
-            if (metaContent.trim()) {
-              return {
-                content: metaContent.trim(),
-                platform: "Threads",
-                transcript: metaContent.trim(),
-              }
+          if (content.trim()) {
+            return {
+              content: content.trim(),
+              platform: "Threads",
+              transcript: content.trim(),
             }
           }
         } else {
-          console.log("[v0] Threads content extraction failed:", response.status, response.statusText)
+          console.log("[v0] Threads API failed:", response.status, response.statusText)
         }
       } catch (error) {
         console.log("[v0] Threads content extraction error:", error)
+      }
+    } else if (platform === "tiktok") {
+      // Use RapidAPI TikTok transcript API
+      try {
+        console.log("[v0] Extracting TikTok content from URL:", url)
+        
+        const response = await fetch(
+          'https://tiktok-transcript.p.rapidapi.com/transcribe-tiktok-audio',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'x-rapidapi-host': 'tiktok-transcript.p.rapidapi.com',
+              'x-rapidapi-key': '95af1b4bc7mshe7f0e89ab036e1bp1639cfjsn4303dd6c7328',
+            },
+            body: `url=${encodeURIComponent(url)}`
+          }
+        )
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log("[v0] TikTok API response:", data)
+          
+          let content = ""
+          if (data.transcript) {
+            content = data.transcript
+          } else if (data.text) {
+            content = data.text
+          } else if (typeof data === "string") {
+            content = data
+          }
+          
+          if (content.trim()) {
+            return {
+              content: content.trim(),
+              platform: "TikTok",
+              transcript: content.trim(),
+            }
+          }
+        } else {
+          console.log("[v0] TikTok API failed:", response.status, response.statusText)
+        }
+      } catch (error) {
+        console.log("[v0] TikTok content extraction error:", error)
       }
     }
   } catch (error) {
@@ -119,8 +152,8 @@ export async function extractContentFromUrl(
   // If we reach here, content extraction failed
   throw new Error(
     language === "zh" 
-      ? "抱歉，此連結類型暫不支援。目前僅支援 YouTube、Instagram 和 Threads 的內容提取。"
-      : "Sorry, this link type is not supported. Currently only YouTube, Instagram, and Threads content extraction is supported."
+      ? "抱歉，無法分析此連結。請確認連結格式正確，目前支援 YouTube、TikTok、Instagram 和 Threads 的內容提取。"
+      : "Sorry, unable to analyze this link. Please check the link format is correct. Currently supporting YouTube, TikTok, Instagram, and Threads content extraction."
   )
 }
 

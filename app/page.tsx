@@ -480,7 +480,12 @@ export default function SocialMediaAnalyzer() {
 
         {transcript && (
           <div className="mb-6 sm:mb-8 animate-in slide-in-from-bottom-4 duration-300">
-            <TranscriptDisplay transcript={transcript} platform={analysis?.platform || "Unknown"} language={language} />
+            <TranscriptDisplay 
+              transcript={transcript} 
+              polishedTranscript={analysis?.polished_transcript}
+              platform={analysis?.platform || "Unknown"} 
+              language={language} 
+            />
           </div>
         )}
 
