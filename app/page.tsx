@@ -103,6 +103,8 @@ const TrendingIcon = () => (
 
 export default function SocialMediaAnalyzer() {
   const [url, setUrl] = useState("")
+  const [manualText, setManualText] = useState("")
+  const [inputMode, setInputMode] = useState<'url' | 'text'>('url')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<any>(null)
   const [transcript, setTranscript] = useState("")
@@ -177,11 +179,21 @@ export default function SocialMediaAnalyzer() {
   }
 
   const handleAnalyze = async () => {
-    if (!url.trim()) {
+    if (inputMode === 'url' && !url.trim()) {
       toast({
         title: language === "zh" ? "請輸入網址" : "Please enter a URL",
         description:
           language === "zh" ? "請輸入有效的社交媒體網址進行分析。" : "Enter a valid social media URL to analyze.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (inputMode === 'text' && !manualText.trim()) {
+      toast({
+        title: language === "zh" ? "請輸入文字內容" : "Please enter text content",
+        description:
+          language === "zh" ? "請輸入您想要分析的文字內容。" : "Enter the text content you want to analyze.",
         variant: "destructive",
       })
       return
@@ -222,14 +234,18 @@ export default function SocialMediaAnalyzer() {
     setTranscript("")
 
     try {
-      console.log("[v0] Starting analysis for URL:", url)
+      console.log("[v0] Starting analysis for:", inputMode === 'url' ? url : 'manual text')
 
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, language }),
+        body: JSON.stringify({ 
+          url: inputMode === 'url' ? url : undefined,
+          manualText: inputMode === 'text' ? manualText : undefined,
+          language 
+        }),
       })
 
       console.log("[v0] Response status:", response.status)
@@ -296,13 +312,6 @@ export default function SocialMediaAnalyzer() {
       return (
         <div className="h-5 w-5 bg-black rounded-full flex items-center justify-center text-white text-xs font-bold">
           T
-        </div>
-      )
-    }
-    if (url.includes("threads.net") || url.includes("threads.com")) {
-      return (
-        <div className="h-5 w-5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-          @
         </div>
       )
     }
@@ -384,8 +393,8 @@ export default function SocialMediaAnalyzer() {
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 text-pretty max-w-2xl mx-auto leading-relaxed">
             {language === "zh"
-              ? "貼上任何 YouTube、TikTok、Instagram 或 Threads 網址，分析文案框架並生成類似的高轉換腳本。"
-              : "Paste any YouTube, TikTok, Instagram, or Threads URL to analyze copywriting frameworks and generate similar high-converting scripts."}
+              ? "貼上任何 YouTube、TikTok、Instagram 網址或手動輸入文字，分析文案框架並生成類似的高轉換腳本。"
+              : "Paste any YouTube, TikTok, Instagram URL or manually input text to analyze copywriting frameworks and generate similar high-converting scripts."}
           </p>
 
           <div className="flex flex-wrap justify-center items-center gap-6 mb-8 text-sm">
@@ -421,30 +430,79 @@ export default function SocialMediaAnalyzer() {
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <LinkIcon />
-              <span className="truncate">{language === "zh" ? "貼上社交媒體網址" : "Paste Social Media URL"}</span>
+              <span className="truncate">
+                {inputMode === 'url' 
+                  ? (language === "zh" ? "貼上社交媒體網址" : "Paste Social Media URL")
+                  : (language === "zh" ? "手動輸入文字" : "Manual Text Input")
+                }
+              </span>
             </CardTitle>
             <CardDescription className="text-sm sm:text-base">
-              {language === "zh"
-                ? "輸入 YouTube、TikTok、Instagram 或 Threads 的網址來分析腳本"
-                : "Enter a URL from YouTube, TikTok, Instagram, or Threads to analyze the script"}
+              {inputMode === 'url'
+                ? (language === "zh"
+                    ? "輸入 YouTube、TikTok 或 Instagram 的網址來分析腳本"
+                    : "Enter a URL from YouTube, TikTok, or Instagram to analyze the script")
+                : (language === "zh"
+                    ? "直接貼上您想要分析的文字內容"
+                    : "Paste the text content you want to analyze directly")
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Input Mode Toggle */}
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
+              <Button
+                variant={inputMode === 'url' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setInputMode('url')}
+                className="flex-1"
+              >
+                <LinkIcon />
+                <span className="ml-2">{language === "zh" ? "網址" : "URL"}</span>
+              </Button>
+              <Button
+                variant={inputMode === 'text' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setInputMode('text')}
+                className="flex-1"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+                <span className="ml-2">{language === "zh" ? "文字" : "Text"}</span>
+              </Button>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Input
-                  type="url"
-                  placeholder="https://youtube.com/watch?v=... or https://tiktok.com/@user/video/..."
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="pl-12 h-12 text-sm sm:text-base border-2 focus:border-blue-500 transition-colors"
-                  onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
-                />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">{getPlatformIcon(url)}</div>
-              </div>
+              {inputMode === 'url' ? (
+                <div className="relative flex-1">
+                  <Input
+                    type="url"
+                    placeholder="https://youtube.com/watch?v=... or https://tiktok.com/@user/video/..."
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="pl-12 h-12 text-sm sm:text-base border-2 focus:border-blue-500 transition-colors"
+                    onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">{getPlatformIcon(url)}</div>
+                </div>
+              ) : (
+                <div className="relative flex-1">
+                  <textarea
+                    placeholder={language === "zh" 
+                      ? "貼上您想要分析的文字內容..." 
+                      : "Paste the text content you want to analyze..."
+                    }
+                    value={manualText}
+                    onChange={(e) => setManualText(e.target.value)}
+                    className="w-full h-24 p-3 text-sm sm:text-base border-2 rounded-md focus:border-blue-500 transition-colors resize-none"
+                    onKeyDown={(e) => e.key === "Enter" && e.ctrlKey && handleAnalyze()}
+                  />
+                </div>
+              )}
               <Button
                 onClick={handleAnalyze}
-                disabled={!url.trim() || isAnalyzing}
+                disabled={(inputMode === 'url' ? !url.trim() : !manualText.trim()) || isAnalyzing}
                 className="px-6 h-12 text-sm sm:text-base font-medium transition-all duration-200 hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                 size="lg"
               >
@@ -477,12 +535,11 @@ export default function SocialMediaAnalyzer() {
                 <InstagramIcon />
                 <span className="ml-1">Instagram</span>
               </Badge>
-              <Badge
-                variant="secondary"
-                className="text-xs hover:bg-purple-100 hover:text-purple-700 transition-colors"
-              >
-                <div className="h-3 w-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mr-1"></div>
-                Threads
+              <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors">
+                <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+                {language === "zh" ? "手動輸入" : "Manual Text"}
               </Badge>
             </div>
           </CardContent>
@@ -643,8 +700,8 @@ export default function SocialMediaAnalyzer() {
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {language === "zh"
-                  ? "分析來自 YouTube、TikTok、Instagram Reels 和 Threads 的內容，提供平台專屬洞察。"
-                  : "Analyze content from YouTube, TikTok, Instagram Reels, and Threads with platform-specific insights."}
+                  ? "分析來自 YouTube、TikTok、Instagram Reels 的內容，或手動輸入文字，提供平台專屬洞察。"
+                  : "Analyze content from YouTube, TikTok, Instagram Reels, or manually input text with platform-specific insights."}
               </p>
             </CardContent>
           </Card>

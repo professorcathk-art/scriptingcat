@@ -5,42 +5,51 @@ import { extractContentFromUrl } from "@/lib/content-extractor"
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Starting analysis request")
-    const { url, language = "en" } = await request.json()
+    const { url, manualText, language = "en" } = await request.json()
     console.log("[v0] Received URL:", url)
+    console.log("[v0] Received manual text:", manualText ? "Yes" : "No")
     console.log("[v0] Language:", language)
 
-    if (!url) {
-      console.log("[v0] Error: No URL provided")
-      return NextResponse.json({ error: "URL is required" }, { status: 400 })
+    if (!url && !manualText) {
+      console.log("[v0] Error: No URL or manual text provided")
+      return NextResponse.json({ error: "URL or manual text is required" }, { status: 400 })
     }
 
     let content = ""
     let platform = ""
     let transcript = ""
 
-    const youtubeVideoId = extractYouTubeVideoId(url)
-    if (youtubeVideoId) {
-      console.log("[v0] YouTube video detected, extracting transcript...")
-      try {
-        transcript = await fetchYouTubeTranscript(youtubeVideoId)
-        content = transcript
-        platform = "YouTube"
-        console.log("[v0] YouTube transcript extracted successfully, length:", content.length)
-      } catch (error) {
-        console.error("[v0] YouTube transcript extraction failed:", error)
-        // Fall back to regular content extraction
+    if (manualText) {
+      // Handle manual text input
+      console.log("[v0] Processing manual text input...")
+      content = manualText.trim()
+      transcript = manualText.trim()
+      platform = "Manual Input"
+    } else if (url) {
+      const youtubeVideoId = extractYouTubeVideoId(url)
+      if (youtubeVideoId) {
+        console.log("[v0] YouTube video detected, extracting transcript...")
+        try {
+          transcript = await fetchYouTubeTranscript(youtubeVideoId)
+          content = transcript
+          platform = "YouTube"
+          console.log("[v0] YouTube transcript extracted successfully, length:", content.length)
+        } catch (error) {
+          console.error("[v0] YouTube transcript extraction failed:", error)
+          // Fall back to regular content extraction
+          const extracted = await extractContentFromUrl(url, language)
+          content = extracted.content
+          platform = extracted.platform
+          transcript = extracted.transcript
+        }
+      } else {
+        // Extract content from the URL using existing method
+        console.log("[v0] Extracting content from URL...")
         const extracted = await extractContentFromUrl(url, language)
         content = extracted.content
         platform = extracted.platform
         transcript = extracted.transcript
       }
-    } else {
-      // Extract content from the URL using existing method
-      console.log("[v0] Extracting content from URL...")
-      const extracted = await extractContentFromUrl(url, language)
-      content = extracted.content
-      platform = extracted.platform
-      transcript = extracted.transcript
     }
 
     console.log("[v0] Content extracted:", { platform, contentLength: content.length, hasTranscript: !!transcript })
@@ -100,7 +109,6 @@ function getTargetAudience(platform: string, language = "en"): string {
     youtube: language === "zh" ? "專業人士 25-45歲" : "Professionals 25-45",
     tiktok: language === "zh" ? "Z世代 16-28歲" : "Gen Z 16-28",
     instagram: language === "zh" ? "千禧世代 22-38歲" : "Millennials 22-38",
-    threads: language === "zh" ? "早期採用者 20-40歲" : "Early Adopters 20-40",
   }
   return (
     audiences[platform.toLowerCase() as keyof typeof audiences] || (language === "zh" ? "一般觀眾" : "General Audience")
