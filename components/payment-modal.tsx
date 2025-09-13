@@ -5,8 +5,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Check, CreditCard, Lock, Zap } from "lucide-react"
 import { SUBSCRIPTION_TIERS, type SubscriptionTier } from "@/lib/subscription"
+import { useToast } from "@/hooks/use-toast"
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -34,23 +36,61 @@ const ZapIcon = () => (
 
 export function PaymentModal({ isOpen, onClose, selectedTier, onPaymentSuccess, language = "en" }: PaymentModalProps) {
   const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card')
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const { toast } = useToast()
 
   if (!selectedTier) return null
 
   const handlePayment = async () => {
+    if (!email.trim()) {
+      toast({
+        title: language === "zh" ? "請輸入電子郵件" : "Email Required",
+        description: language === "zh" ? "請輸入您的電子郵件地址" : "Please enter your email address",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsProcessing(true)
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tierId: selectedTier.id,
+          email: email.trim(),
+          name: name.trim() || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session')
+      }
+
+      const { sessionId } = await response.json()
       
-      // In a real implementation, you would integrate with Stripe, PayPal, etc.
-      // For now, we'll simulate a successful payment
-      onPaymentSuccess(selectedTier.id)
-      onClose()
+      // Redirect to Stripe Checkout
+      const stripe = await import('@stripe/stripe-js').then(({ loadStripe }) => 
+        loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+      )
+      
+      if (stripe) {
+        const { error } = await stripe.redirectToCheckout({ sessionId })
+        if (error) {
+          throw new Error(error.message)
+        }
+      }
     } catch (error) {
       console.error('Payment failed:', error)
+      toast({
+        title: language === "zh" ? "付款失敗" : "Payment Failed",
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: "destructive",
+      })
     } finally {
       setIsProcessing(false)
     }
@@ -104,33 +144,50 @@ export function PaymentModal({ isOpen, onClose, selectedTier, onPaymentSuccess, 
             </ul>
           </div>
 
-          {/* Payment Methods */}
+          {/* Customer Information */}
+          <div>
+            <h4 className="font-semibold mb-2">
+              {language === "zh" ? "客戶資訊" : "Customer Information"}
+            </h4>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  {language === "zh" ? "電子郵件" : "Email"} *
+                </label>
+                <Input
+                  type="email"
+                  placeholder={language === "zh" ? "your@email.com" : "your@email.com"}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  {language === "zh" ? "姓名" : "Name"} ({language === "zh" ? "選填" : "Optional"})
+                </label>
+                <Input
+                  type="text"
+                  placeholder={language === "zh" ? "您的姓名" : "Your name"}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Method */}
           <div>
             <h4 className="font-semibold mb-2">
               {language === "zh" ? "付款方式" : "Payment Method"}
             </h4>
-            <div className="space-y-2">
-              <Button
-                variant={paymentMethod === 'card' ? 'default' : 'outline'}
-                className="w-full justify-start"
-                onClick={() => setPaymentMethod('card')}
-              >
-                <CreditCardIcon />
-                <span className="ml-2">
-                  {language === "zh" ? "信用卡/借記卡" : "Credit/Debit Card"}
-                </span>
-              </Button>
-              
-              <Button
-                variant={paymentMethod === 'paypal' ? 'default' : 'outline'}
-                className="w-full justify-start"
-                onClick={() => setPaymentMethod('paypal')}
-              >
-                <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">P</span>
-                </div>
-                <span className="ml-2">PayPal</span>
-              </Button>
+            <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+              <CreditCardIcon />
+              <span className="text-sm">
+                {language === "zh" ? "安全信用卡付款 (由 Stripe 處理)" : "Secure card payment (processed by Stripe)"}
+              </span>
             </div>
           </div>
 

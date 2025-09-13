@@ -135,6 +135,16 @@ export default function SocialMediaAnalyzer() {
         console.error("Failed to parse saved subscription:", error)
       }
     }
+
+    // Check for upgrade parameter in URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const upgradeTier = urlParams.get('upgrade')
+    if (upgradeTier && (upgradeTier === 'pro' || upgradeTier === 'expert')) {
+      setSelectedTierForPayment(upgradeTier)
+      setShowPaymentModal(true)
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
   }, [])
 
   const handleLanguageSelect = (selectedLang: string) => {
