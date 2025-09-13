@@ -49,47 +49,85 @@ export async function extractContentFromUrl(
       } else {
         console.log("[v0] Instagram API failed:", response.status, response.statusText)
       }
+    } else if (platform === "threads") {
+      // For Threads, we'll extract the text content from the post
+      // Since Threads doesn't have a public API, we'll use a web scraping approach
+      try {
+        console.log("[v0] Extracting Threads content from URL:", url)
+        
+        // Use a web scraping service or direct fetch to get the page content
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        })
+        
+        if (response.ok) {
+          const html = await response.text()
+          
+          // Extract text content from the Threads post
+          // This is a simplified approach - in production you might want to use a more robust parser
+          const textMatch = html.match(/"text":"([^"]+)"/g)
+          if (textMatch && textMatch.length > 0) {
+            // Get the first text match (usually the main post content)
+            const textContent = textMatch[0].replace(/"text":"([^"]+)"/, '$1')
+            // Decode any escaped characters
+            const decodedContent = textContent
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .replace(/\\'/g, "'")
+              .replace(/\\\\/g, '\\')
+            
+            if (decodedContent.trim()) {
+              return {
+                content: decodedContent.trim(),
+                platform: "Threads",
+                transcript: decodedContent.trim(),
+              }
+            }
+          }
+          
+          // Fallback: try to extract from meta tags
+          const metaMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i)
+          if (metaMatch) {
+            const metaContent = metaMatch[1]
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+            
+            if (metaContent.trim()) {
+              return {
+                content: metaContent.trim(),
+                platform: "Threads",
+                transcript: metaContent.trim(),
+              }
+            }
+          }
+        } else {
+          console.log("[v0] Threads content extraction failed:", response.status, response.statusText)
+        }
+      } catch (error) {
+        console.log("[v0] Threads content extraction error:", error)
+      }
     }
   } catch (error) {
-    console.log("[v0] Instagram API error:", error)
+    console.log("[v0] Content extraction error:", error)
   }
 
-  const mockContent =
-    language === "zh"
-      ? {
-          youtube:
-            "大家好！你們是否厭倦了生產力低下的困擾？在今天的影片中，我將向你們展示幫助我在30天內將產出翻倍的確切系統。但首先，讓我問你們這個問題 - 你們每天在不能真正推動進展的任務上浪費了多少小時？如果你們像大多數人一樣，可能比你們想像的還要多。請繼續觀看，因為我即將揭示改變我一切的三步框架。如果你們看到最後，我會給你們我的免費生產力清單，你們現在就可以下載。讓我們開始吧！",
-          tiktok:
-            "POV：你一直都做錯了晨間例行公事！成功人士實際上是這樣做的：第一步 - 他們在第一個小時內不看手機。第二步 - 他們做這個只需5分鐘的奇怪運動。第三步 - 他們吃這種特定的早餐，能將腦力提升40%。想知道那個運動和早餐是什麼嗎？關注我看第二部分！如果你想要我完整的晨間清單發送到你的私訊，請評論'例行公事'。",
-          instagram:
-            "滑動查看我工作空間改造的前後對比！➡️ 我以前在床上工作（別批評我😅），但在實施這5個簡單改變後，我的生產力飆升，終於開始達成目標。最棒的是？總共花費不到100美元。保存這篇貼文並嘗試這些技巧 - 你未來的自己會感謝你！你最大的工作空間挑戰是什麼？在下面的評論中告訴我👇",
-          threads:
-            "不受歡迎的觀點：大多數生產力建議都是垃圾。以下是真正有效的方法（來自一個從倦怠到六位數業務的人）：1. 停止嘗試優化一切 2. 專注於系統，而不是目標 3. 將類似任務批量處理 4. 對80%的機會說不 5. 自動化無聊的事情。秘訣不是更努力工作 - 而是在正確的事情上工作。你收到過的最好的生產力建議是什麼？",
-        }
-      : {
-          youtube:
-            "Hey everyone! Are you tired of struggling with productivity? In today's video, I'm going to show you the exact system that helped me double my output in just 30 days. But first, let me ask you this - how many hours do you waste each day on tasks that don't actually move the needle? If you're like most people, it's probably more than you think. Stay tuned because I'm about to reveal the three-step framework that changed everything for me. And if you stick around until the end, I'll give you my free productivity checklist that you can download right now. Let's dive in!",
-          tiktok:
-            "POV: You've been doing morning routines all wrong! Here's what successful people actually do: Step 1 - They don't check their phone for the first hour. Step 2 - They do this one weird exercise that takes 5 minutes. Step 3 - They eat this specific breakfast that boosts brain power by 40%. Want to know what that exercise and breakfast are? Follow me for part 2! And comment 'ROUTINE' if you want my full morning checklist sent to your DMs.",
-          instagram:
-            "Swipe to see the before and after of my workspace transformation! ➡️ I used to work from my bed (don't judge me 😅) but after implementing these 5 simple changes, my productivity skyrocketed and I finally started hitting my goals. The best part? It cost me less than $100 total. Save this post and try these tips - your future self will thank you! What's your biggest workspace challenge? Tell me in the comments below 👇",
-          threads:
-            "Unpopular opinion: Most productivity advice is garbage. Here's what actually works (from someone who went from burnout to 6-figure business): 1. Stop trying to optimize everything 2. Focus on systems, not goals 3. Batch similar tasks together 4. Say no to 80% of opportunities 5. Automate the boring stuff The secret isn't working harder - it's working on the right things. What's the best productivity tip you've ever received?",
-        }
-
-  const content = mockContent[platform as keyof typeof mockContent] || mockContent.youtube
-
-  return {
-    content,
-    platform: platform.charAt(0).toUpperCase() + platform.slice(1),
-    transcript: content, // For mock content, transcript is the same as content
-  }
+  // If we reach here, content extraction failed
+  throw new Error(
+    language === "zh" 
+      ? "抱歉，此連結類型暫不支援。目前僅支援 YouTube、Instagram 和 Threads 的內容提取。"
+      : "Sorry, this link type is not supported. Currently only YouTube, Instagram, and Threads content extraction is supported."
+  )
 }
 
 function detectPlatform(url: string): string {
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube"
   if (url.includes("tiktok.com")) return "tiktok"
   if (url.includes("instagram.com")) return "instagram"
-  if (url.includes("threads.net")) return "threads"
+  if (url.includes("threads.net") || url.includes("threads.com")) return "threads"
   return "unknown"
 }

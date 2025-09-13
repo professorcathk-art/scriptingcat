@@ -9,7 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AnalysisDisplay } from "@/components/analysis-display"
 import { ScriptGenerator } from "@/components/script-generator"
 import { TranscriptDisplay } from "@/components/transcript-display"
+import { SubscriptionManager } from "@/components/subscription-manager"
+import { PaymentModal } from "@/components/payment-modal"
 import { useToast } from "@/hooks/use-toast"
+import { 
+  type UserSubscription, 
+  getDefaultSubscription, 
+  canGenerateScript, 
+  incrementUsage, 
+  resetDailyUsage,
+  getSubscriptionTier 
+} from "@/lib/subscription"
 
 const LoaderIcon = () => (
   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -98,6 +108,10 @@ export default function SocialMediaAnalyzer() {
   const [transcript, setTranscript] = useState("")
   const [language, setLanguage] = useState("en")
   const [showLanguageSelector, setShowLanguageSelector] = useState(false)
+  const [userSubscription, setUserSubscription] = useState<UserSubscription>(getDefaultSubscription())
+  const [showSubscriptionManager, setShowSubscriptionManager] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedTierForPayment, setSelectedTierForPayment] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -110,12 +124,46 @@ export default function SocialMediaAnalyzer() {
         setShowLanguageSelector(true)
       }
     }
+
+    // Load saved subscription data
+    const savedSubscription = localStorage.getItem("user-subscription")
+    if (savedSubscription) {
+      try {
+        const subscription = JSON.parse(savedSubscription)
+        setUserSubscription(subscription)
+      } catch (error) {
+        console.error("Failed to parse saved subscription:", error)
+      }
+    }
   }, [])
 
   const handleLanguageSelect = (selectedLang: string) => {
     setLanguage(selectedLang)
     localStorage.setItem("preferred-language", selectedLang)
     setShowLanguageSelector(false)
+  }
+
+  const handleUpgrade = (tierId: string) => {
+    setSelectedTierForPayment(tierId)
+    setShowPaymentModal(true)
+  }
+
+  const handlePaymentSuccess = (tierId: string) => {
+    const newSubscription = {
+      ...userSubscription,
+      tier: tierId,
+      status: 'active' as const,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+    }
+    setUserSubscription(newSubscription)
+    localStorage.setItem('user-subscription', JSON.stringify(newSubscription))
+    
+    toast({
+      title: language === "zh" ? "升級成功！" : "Upgrade successful!",
+      description: language === "zh" 
+        ? `您已成功升級到 ${getSubscriptionTier(tierId)?.name} 方案`
+        : `You've successfully upgraded to ${getSubscriptionTier(tierId)?.name} plan`,
+    })
   }
 
   const handleAnalyze = async () => {
@@ -126,6 +174,25 @@ export default function SocialMediaAnalyzer() {
           language === "zh" ? "請輸入有效的社交媒體網址進行分析。" : "Enter a valid social media URL to analyze.",
         variant: "destructive",
       })
+      return
+    }
+
+    // Reset daily usage if it's a new day
+    const updatedSubscription = resetDailyUsage(userSubscription)
+    if (updatedSubscription !== userSubscription) {
+      setUserSubscription(updatedSubscription)
+    }
+
+    // Check if user can generate scripts
+    if (!canGenerateScript(updatedSubscription)) {
+      toast({
+        title: language === "zh" ? "使用次數已達上限" : "Usage limit reached",
+        description: language === "zh" 
+          ? "您今日的使用次數已達上限。請升級方案以獲得更多使用次數。"
+          : "You've reached your daily usage limit. Please upgrade your plan for more uses.",
+        variant: "destructive",
+      })
+      setShowSubscriptionManager(true)
       return
     }
 
@@ -184,6 +251,11 @@ export default function SocialMediaAnalyzer() {
       setAnalysis(analysisResult)
       setTranscript(analysisResult.transcript || "")
 
+      // Increment usage count
+      const newSubscription = incrementUsage(updatedSubscription)
+      setUserSubscription(newSubscription)
+      localStorage.setItem('user-subscription', JSON.stringify(newSubscription))
+
       toast({
         title: language === "zh" ? "分析完成！" : "Analysis complete!",
         description: language === "zh" ? "您的內容已成功分析。" : "Your content has been analyzed successfully.",
@@ -217,7 +289,7 @@ export default function SocialMediaAnalyzer() {
         </div>
       )
     }
-    if (url.includes("threads.net")) {
+    if (url.includes("threads.net") || url.includes("threads.com")) {
       return (
         <div className="h-5 w-5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
           @
@@ -271,15 +343,26 @@ export default function SocialMediaAnalyzer() {
                 </p>
               </div>
             </div>
-            <Select value={language} onValueChange={(value) => handleLanguageSelect(value)}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="zh">繁體中文</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSubscriptionManager(true)}
+                className="hidden sm:flex items-center gap-2"
+              >
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                {getSubscriptionTier(userSubscription.tier)?.name}
+              </Button>
+              <Select value={language} onValueChange={(value) => handleLanguageSelect(value)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="zh">繁體中文</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </header>
@@ -587,6 +670,38 @@ export default function SocialMediaAnalyzer() {
           </div>
         </footer>
       </main>
+
+      {/* Subscription Manager Modal */}
+      {showSubscriptionManager && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">
+                  {language === "zh" ? "訂閱方案" : "Subscription Plans"}
+                </h2>
+                <Button variant="ghost" onClick={() => setShowSubscriptionManager(false)}>
+                  ✕
+                </Button>
+              </div>
+              <SubscriptionManager
+                userSubscription={userSubscription}
+                onUpgrade={handleUpgrade}
+                language={language}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        selectedTier={selectedTierForPayment ? getSubscriptionTier(selectedTierForPayment) || null : null}
+        onPaymentSuccess={handlePaymentSuccess}
+        language={language}
+      />
     </div>
   )
 }
